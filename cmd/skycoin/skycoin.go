@@ -120,7 +120,7 @@ func main() {
 	}, logger)
 
 	// parse config values
-	if err := coin.ParseConfig(); err != nil {
+	if err := coin.ParseConfig(flag.CommandLine); err != nil {
 		logger.Error(err)
 		os.Exit(1)
 	}
