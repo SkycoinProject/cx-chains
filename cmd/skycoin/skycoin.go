@@ -101,7 +101,7 @@ var (
 )
 
 func init() {
-	nodeConfig.RegisterFlags()
+	nodeConfig.RegisterFlags(flag.CommandLine)
 }
 
 func main() {
