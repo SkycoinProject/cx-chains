@@ -32,7 +32,7 @@ type HashPair struct {
 
 // BlockHeader records the block header
 type BlockHeader struct {
-	Version uint32
+	Version uint32 // Version is the chain version, not the node version.
 
 	Time  uint64
 	BkSeq uint64 // Increment every block
