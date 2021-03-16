@@ -42,6 +42,59 @@ var (
 	ErrInvalidLocPrefix = errors.New("invalid spec location prefix")
 )
 
+// LocateConfig contains flag values for Locate.
+type LocateConfig struct {
+	CXChain   string // CX Chain spec location string.
+	CXTracker string // CX Tracker URL.
+
+	Logger     logrus.FieldLogger
+	HTTPClient *http.Client
+}
+
+// FillDefaults fills LocateConfig with default values.
+func (c *LocateConfig) FillDefaults() {
+	c.CXChain = DefaultSpecLocStr
+	c.CXTracker = DefaultTrackerURL
+	c.Logger = logging.MustGetLogger("spec_loc")
+}
+
+// DefaultLocateConfig returns the default LocateConfig set.
+func DefaultLocateConfig() LocateConfig {
+	var lc LocateConfig
+	lc.FillDefaults()
+	return lc
+}
+
+// SoftParse parses the OS args for the 'chain' flag.
+// It is called 'soft' parse because the existence of non-defined flags does not
+// result in failure.
+func (c *LocateConfig) SoftParse(args []string) {
+	if v, ok := obtainFlagValue(args, "chain"); ok {
+		c.CXChain = v
+	}
+	if v, ok := obtainFlagValue(args, "tracker"); ok {
+		c.CXTracker = v
+	}
+}
+
+// RegisterFlags ensures that the 'help' menu contains the locate flags and that
+// the flags are recognized.
+func (c *LocateConfig) RegisterFlags(fs *flag.FlagSet) {
+	var temp string
+	fs.StringVar(&temp, "chain", c.CXChain, fmt.Sprintf("cx chain location. Prepend with '%s:' or '%s:' for spec location type.", FileLoc, TrackerLoc))
+	fs.StringVar(&temp, "tracker", c.CXTracker, "CX Tracker `URL`.")
+}
+
+// TrackerClient generates a CX Tracker client based on the defined config.
+func (c *LocateConfig) TrackerClient() *CXTrackerClient {
+	return NewCXTrackerClient(c.Logger, c.HTTPClient, c.CXTracker)
+}
+
+// LocateWithConfig locates a spec with a given locate config.
+func LocateWithConfig(ctx context.Context, conf *LocateConfig) (ChainSpec, error) {
+	return Locate(ctx, conf.Logger, conf.TrackerClient(), conf.CXChain)
+}
+
 // Locate locates the chain spec given a 'loc' string.
 // The 'loc' string is to be of format '<location-prefix>:<location>'.
 // * <location-prefix> is 'tracker' if undefined.
@@ -98,6 +151,10 @@ func Locate(ctx context.Context, log logrus.FieldLogger, tracker *CXTrackerClien
 	}
 }
 
+/*
+	<< Helper functions >>
+*/
+
 func splitLocString(loc string) (prefix LocPrefix, suffix string, err error) {
 	loc = strings.TrimSpace(loc)
 	if loc == "" {
@@ -117,63 +174,6 @@ func splitLocString(loc string) (prefix LocPrefix, suffix string, err error) {
 
 	return LocPrefix(locParts[0]), locParts[1], nil
 }
-
-// LocateConfig contains flag values for Locate.
-type LocateConfig struct {
-	CXChain   string // CX Chain spec location string.
-	CXTracker string // CX Tracker URL.
-
-	Logger logrus.FieldLogger
-	HTTPClient *http.Client
-}
-
-// FillDefaults fills LocateConfig with default values.
-func (c *LocateConfig) FillDefaults() {
-	c.CXChain = DefaultSpecLocStr
-	c.CXTracker = DefaultTrackerURL
-	c.Logger = logging.MustGetLogger("spec_loc")
-}
-
-// DefaultLocateConfig returns the default LocateConfig set.
-func DefaultLocateConfig() LocateConfig {
-	var lc LocateConfig
-	lc.FillDefaults()
-	return lc
-}
-
-// SoftParse parses the OS args for the 'chain' flag.
-// It is called 'soft' parse because the existence of non-defined flags does not
-// result in failure.
-func (c *LocateConfig) SoftParse(args []string) {
-	if v, ok := obtainFlagValue(args, "chain"); ok {
-		c.CXChain = v
-	}
-	if v, ok := obtainFlagValue(args, "tracker"); ok {
-		c.CXTracker = v
-	}
-}
-
-// RegisterFlags ensures that the 'help' menu contains the locate flags and that
-// the flags are recognized.
-func (c *LocateConfig) RegisterFlags(fs *flag.FlagSet) {
-	var temp string
-	fs.StringVar(&temp, "chain", c.CXChain, fmt.Sprintf("cx chain location. Prepend with '%s:' or '%s:' for spec location type.", FileLoc, TrackerLoc))
-	fs.StringVar(&temp, "tracker", c.CXTracker, "CX Tracker `URL`.")
-}
-
-// TrackerClient generates a CX Tracker client based on the defined config.
-func (c *LocateConfig) TrackerClient() *CXTrackerClient {
-	return NewCXTrackerClient(c.Logger, c.HTTPClient, c.CXTracker)
-}
-
-// LocateWithConfig locates a spec with a given locate config.
-func LocateWithConfig(ctx context.Context, conf *LocateConfig) (ChainSpec, error) {
-	return Locate(ctx, conf.Logger, conf.TrackerClient(), conf.CXChain)
-}
-
-/*
-	<< Helper functions >>
-*/
 
 func obtainFlagValue(args []string, key string) (string, bool) {
 	var (
