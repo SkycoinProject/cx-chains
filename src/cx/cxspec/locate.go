@@ -11,6 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/skycoin/skycoin/src/cipher"
 	"github.com/skycoin/skycoin/src/util/logging"
+
+	"github.com/skycoin/cx-chains/src/cx/cxspec/cxspecalpha"
 )
 
 // LocPrefix determines the location type of the location string.
@@ -91,7 +93,7 @@ func (c *LocateConfig) TrackerClient() *CXTrackerClient {
 }
 
 // LocateWithConfig locates a spec with a given locate config.
-func LocateWithConfig(ctx context.Context, conf *LocateConfig) (ChainSpec, error) {
+func LocateWithConfig(ctx context.Context, conf *LocateConfig) (cxspecalpha.ChainSpec, error) {
 	return Locate(ctx, conf.Logger, conf.TrackerClient(), conf.CXChain)
 }
 
@@ -101,7 +103,7 @@ func LocateWithConfig(ctx context.Context, conf *LocateConfig) (ChainSpec, error
 // * <location> either specifies the cx chain's genesis hash (if
 // <location-prefix> is 'tracker') or filepath of the spec file (if
 // <location-prefix> is 'file').
-func Locate(ctx context.Context, log logrus.FieldLogger, tracker *CXTrackerClient, loc string) (ChainSpec, error) {
+func Locate(ctx context.Context, log logrus.FieldLogger, tracker *CXTrackerClient, loc string) (cxspecalpha.ChainSpec, error) {
 	// Ensure logger is existent.
 	if log == nil {
 		log = logging.MustGetLogger("cxspec").WithField("func", "Locate")
@@ -109,7 +111,7 @@ func Locate(ctx context.Context, log logrus.FieldLogger, tracker *CXTrackerClien
 
 	prefix, suffix, err := splitLocString(loc)
 	if err != nil {
-		return ChainSpec{}, err
+		return cxspecalpha.ChainSpec{}, err
 	}
 
 	// Check location prefix (LocPrefix).
@@ -124,30 +126,30 @@ func Locate(ctx context.Context, log logrus.FieldLogger, tracker *CXTrackerClien
 	case TrackerLoc:
 		// Check that 'tracker' is not nil.
 		if tracker == nil {
-			return ChainSpec{}, ErrEmptyTracker
+			return cxspecalpha.ChainSpec{}, ErrEmptyTracker
 		}
 
 		// Obtain genesis hash from hex string.
 		hash, err := cipher.SHA256FromHex(suffix)
 		if err != nil {
-			return ChainSpec{}, fmt.Errorf("invalid genesis hash provided '%s': %w", loc, err)
+			return cxspecalpha.ChainSpec{}, fmt.Errorf("invalid genesis hash provided '%s': %w", loc, err)
 		}
 
 		// Obtain spec from tracker.
 		signedChainSpec, err := tracker.SpecByGenesisHash(ctx, hash)
 		if err != nil {
-			return ChainSpec{}, fmt.Errorf("chain spec not of genesis hash not found in tracker: %w", err)
+			return cxspecalpha.ChainSpec{}, fmt.Errorf("chain spec not of genesis hash not found in tracker: %w", err)
 		}
 
 		// Verify again (no harm in doing it twice).
 		if err := signedChainSpec.Verify(); err != nil {
-			return ChainSpec{}, err
+			return cxspecalpha.ChainSpec{}, err
 		}
 
 		return signedChainSpec.Spec, nil
 
 	default:
-		return ChainSpec{}, fmt.Errorf("%w '%s'", ErrInvalidLocPrefix, prefix)
+		return cxspecalpha.ChainSpec{}, fmt.Errorf("%w '%s'", ErrInvalidLocPrefix, prefix)
 	}
 }
 
