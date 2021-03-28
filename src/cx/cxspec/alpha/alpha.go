@@ -1,4 +1,4 @@
-package cxspecalpha
+package alpha
 
 import (
 	"encoding/base64"
@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/skycoin/skycoin/src/cipher"
 
 	"github.com/skycoin/cx-chains/src/coin"
+	"github.com/skycoin/cx-chains/src/params"
+	"github.com/skycoin/cx-chains/src/readable"
+	"github.com/skycoin/cx-chains/src/skycoin"
 )
 
 const Era = "cx_alpha"
@@ -75,6 +79,7 @@ type ChainSpec struct {
 	SpecEra string `json:"spec_era"`
 
 	ChainPubKey string `json:"chain_pubkey"` // Blockchain public key.
+	TrackerAddr string `json:"tracker_addr"` // CX Tracker address.
 
 	Protocol ProtocolParams `json:"protocol"` // Params that define the transaction protocol.
 	Node     NodeParams     `json:"node"`     // Default params for a node of given coin (this may be removed in future eras).
@@ -114,6 +119,7 @@ func New(coin, ticker string, chainSK cipher.SecKey, genesisAddr cipher.Address,
 	spec := &ChainSpec{
 		SpecEra:     Era,
 		ChainPubKey: "", // ChainPubKey is generated at a later step via generateAndSignGenesisBlock
+		TrackerAddr: "", // TODO @evanlinjin: Have default tracker address.
 		Protocol:    DefaultProtocolParams(),
 		Node:        DefaultNodeParams(),
 
@@ -135,67 +141,15 @@ func New(coin, ticker string, chainSK cipher.SecKey, genesisAddr cipher.Address,
 	}
 
 	// Generate genesis signature.
-	if _, err := generateAndSignGenesisBlock(spec, chainSK); err != nil {
+	block, err := generateGenesisBlock(spec)
+	if err != nil {
+		return nil, err
+	}
+	if err := signAndFill(spec, block, chainSK); err != nil {
 		return nil, err
 	}
 
 	return spec, nil
-}
-
-func PrepareTemplate() map[string]interface{} {
-	t := make(map[string]interface{})
-	t["protocol"] = ProtocolParams{}
-	t["node"] = NodeParams{}
-
-	return t
-}
-
-func ParseTemplate(t map[string]interface{}) (cs *ChainSpec, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("failed to extract from raw chain spec: %v", r)
-		}
-	}()
-
-	protocolP, ok := t["protocol"].(ProtocolParams)
-	if !ok {
-		return nil, fmt.Errorf("internal error: failed to extract 'protocol' field of spec")
-	}
-
-	nodeP, ok := t["node"].(NodeParams)
-	if !ok {
-		return nil, fmt.Errorf("internal error: failed to extract 'node' field of spec")
-	}
-
-	cs = &ChainSpec{
-		SpecEra:           t["spec_era"].(string),
-		ChainPubKey:       t["chain_pubkey"].(string),
-		Protocol:          protocolP,
-		Node:              nodeP,
-		CoinName:          t["coin_name"].(string),
-		CoinTicker:        t["coin_ticker"].(string),
-		GenesisAddr:       t["genesis_address"].(string),
-		GenesisSig:        t["genesis_signature"].(string),
-		GenesisCoinVolume: uint64(t["genesis_coin_volume"].(float64)),
-		GenesisProgState:  t["genesis_program_state"].(string),
-		GenesisTimestamp:  uint64(t["genesis_timestamp"].(float64)),
-		MaxCoinSupply:     uint64(t["max_coin_supply"].(float64)),
-		// chainPK:           cipher.PubKey{},
-		// genAddr:           cipher.Address{},
-		// genSig:            cipher.Sig{},
-		// genProgState:      nil,
-	}
-
-	if cs.SpecEra != Era {
-		return nil, fmt.Errorf("internal error: spec error does not match: expected '%s', got '%s'",
-			Era, cs.SpecEra)
-	}
-
-	if err = postProcess(cs, false); err != nil {
-		return nil, fmt.Errorf("invalid chain spec: %w", err)
-	}
-
-	return cs, err
 }
 
 func (cs *ChainSpec) RawGenesisProgState() []byte {
@@ -206,9 +160,67 @@ func (cs *ChainSpec) RawGenesisProgState() []byte {
 	return b
 }
 
-// GenerateGenesisBlock generates a genesis block from the chain spec and verifies it.
+// SpecHash returns the hashed spec object.
+func (cs *ChainSpec) CXSpecHash() cipher.SHA256 {
+	b, err := json.Marshal(cs)
+	if err != nil {
+		panic(err)
+	}
+	return cipher.SumSHA256(b)
+}
+
+// CXSpecEra returns the spec era string.
+func (*ChainSpec) CXSpecEra() string { return Era }
+
+// String prints an indented json representation of the chain spec.
+func (cs *ChainSpec) String() string {
+	b, err := json.MarshalIndent(cs, "", "\t")
+	if err != nil {
+		panic(err)
+	}
+
+	return string(b)
+}
+
+// Finalize finalizes the spec, providing the genesis public key and genesis
+// signature.
+func (cs *ChainSpec) Finalize(genesisSK cipher.SecKey) error {
+	if err := postProcess(cs, true); err != nil {
+		return err
+	}
+
+	block, err := generateGenesisBlock(cs)
+	if err != nil {
+		return err
+	}
+
+	if err := signAndFill(cs, block, genesisSK); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Check checks whether the spec is valid.
+func (cs *ChainSpec) Check() error {
+	if _, err := cs.ObtainGenesisBlock(); err != nil {
+		return err
+	}
+
+	// TODO @evanlinjin: Implement more checks.
+
+	return nil
+}
+
+// ObtainCoinName obtains the coin name of the spec.
+func (cs *ChainSpec) ObtainCoinName() string { return cs.CoinName }
+
+// ObtainCoinTicker obtains the coin ticker of the spec.
+func (cs *ChainSpec) ObtainCoinTicker() string { return cs.CoinTicker }
+
+// ObtainGenesisBlock generates a genesis block from the chain spec and verifies it.
 // It returns an error if anything fails.
-func (cs *ChainSpec) GenerateGenesisBlock() (*coin.Block, error) {
+func (cs *ChainSpec) ObtainGenesisBlock() (*coin.Block, error) {
 	if err := postProcess(cs, false); err != nil {
 		return nil, err
 	}
@@ -225,49 +237,77 @@ func (cs *ChainSpec) GenerateGenesisBlock() (*coin.Block, error) {
 	return block, nil
 }
 
-// GenerateAndSignGenesisBlock is used to generate and sign a genesis block.
-// Associated fields in chain spec are also updated.
-func (cs *ChainSpec) GenerateAndSignGenesisBlock(sk cipher.SecKey) (*coin.Block, error) {
-	if err := postProcess(cs, true); err != nil {
-		return nil, err
-	}
-
-	return generateAndSignGenesisBlock(cs, sk)
+// ObtainChainPubKey returns the processed chain public key.
+func (cs *ChainSpec) ObtainChainPubKey() (cipher.PubKey, error) {
+	return cipher.PubKeyFromHex(cs.ChainPubKey)
 }
 
-// Sign signs the genesis block and fills the chain spec with the resultant data.
-// The fields changed are ChainPubKey and GenesisSig (and also the post-processed fields).
-func (cs *ChainSpec) Sign(sk cipher.SecKey) error {
-	if err := postProcess(cs, true); err != nil {
+// PopulateParamsModule populates the params module within cx chain.
+func (cs *ChainSpec) PopulateParamsModule() error {
+	// TODO @evanlinjin: Figure out distribution.
+	params.MainNetDistribution = params.Distribution{
+		MaxCoinSupply:        cs.MaxCoinSupply,
+		InitialUnlockedCount: 1,
+		UnlockAddressRate:    0,
+		UnlockTimeInterval:   0,
+		Addresses:            []string{cs.GenesisAddr},
+	}
+	params.UserVerifyTxn = params.VerifyTxn{
+		BurnFactor:          uint32(cs.Node.UserBurnFactor),
+		MaxTransactionSize:  cs.Node.UserMaxTransactionSize,
+		MaxDropletPrecision: uint8(cs.Node.UserMaxDropletPrecision),
+	}
+	params.InitFromEnv()
+
+	return nil
+}
+
+// PopulateNodeConfig populates the node config with values from cx chain spec.
+func (cs *ChainSpec) PopulateNodeConfig(conf *skycoin.NodeConfig) error {
+	genesis, err := cs.ObtainGenesisBlock()
+	if err != nil {
 		return err
 	}
+	peerListURL := fmt.Sprintf("%s/peerlists/%s.txt", cs.TrackerAddr, genesis.HashHeader())
 
-	_, err := generateAndSignGenesisBlock(cs, sk)
-	return err
-}
+	conf.CoinName = cs.CoinName
+	conf.PeerListURL = peerListURL
+	conf.Port = cs.Node.Port
+	conf.WebInterfacePort = cs.Node.WebInterfacePort
+	conf.UnconfirmedVerifyTxn = params.VerifyTxn{
+		BurnFactor:          cs.Protocol.UnconfirmedBurnFactor,
+		MaxTransactionSize:  cs.Protocol.UnconfirmedMaxTransactionSize,
+		MaxDropletPrecision: cs.Protocol.UnconfirmedMaxDropletPrecision,
+	}
+	conf.CreateBlockVerifyTxn = params.VerifyTxn{
+		BurnFactor:          cs.Protocol.CreateBlockBurnFactor,
+		MaxTransactionSize:  cs.Protocol.CreateBlockMaxTransactionSize,
+		MaxDropletPrecision: cs.Protocol.CreateBlockMaxDropletPrecision,
+	}
+	conf.MaxBlockTransactionsSize = cs.Protocol.MaxBlockTransactionSize
+	conf.GenesisSignatureStr = cs.GenesisSig
+	conf.GenesisAddressStr = cs.GenesisAddr
+	conf.BlockchainPubkeyStr = cs.ChainPubKey
+	conf.GenesisTimestamp = cs.GenesisTimestamp
+	conf.GenesisCoinVolume = cs.GenesisCoinVolume
+	conf.DefaultConnections = cs.Node.DefaultConnections
 
-// ProcessedChainPubKey returns the processed chain public key.
-func (cs ChainSpec) ProcessedChainPubKey() cipher.PubKey {
-	return cs.chainPK
-}
-
-// PrintString prints an indented json representation of the chain spec.
-func (cs *ChainSpec) PrintString() string {
-	b, err := json.MarshalIndent(cs, "", "\t")
-	if err != nil {
-		panic(err)
+	conf.Fiber = readable.FiberConfig{
+		Name:            cs.CoinName,
+		DisplayName:     cs.CoinName,
+		Ticker:          cs.CoinTicker,
+		CoinHoursName:   coinHoursName(cs.CoinName),
+		CoinHoursTicker: coinHoursTicker(cs.CoinTicker),
+		ExplorerURL:     "", // TODO @evanlinjin: CX Chain explorer?
 	}
 
-	return string(b)
-}
-
-// SpecHash returns the hashed spec object.
-func (cs *ChainSpec) SpecHash() cipher.SHA256 {
-	b, err := json.Marshal(cs)
-	if err != nil {
-		panic(err)
+	if conf.DataDirectory == "" {
+		conf.DataDirectory = "$HOME/.cxchain/" + cs.CoinName
+	} else {
+		conf.DataDirectory = strings.ReplaceAll(conf.DataDirectory, "{coin}", cs.CoinName)
 	}
-	return cipher.SumSHA256(b)
+
+	return nil
 }
 
 /*
@@ -310,29 +350,44 @@ func generateGenesisBlock(cs *ChainSpec) (*coin.Block, error) {
 	return block, nil
 }
 
-// generateAndSignGenesisBlock generates and signs the genesis block (using specified fields from chain spec).
-// Hence, ChainPubKey and GenesisSig fields are also filled.
-func generateAndSignGenesisBlock(cs *ChainSpec, sk cipher.SecKey) (*coin.Block, error) {
-	block, err := generateGenesisBlock(cs)
-	if err != nil {
-		return nil, err
-	}
-
+// signAndFill fills the chain spec with block and block signature.
+func signAndFill(cs *ChainSpec, block *coin.Block, sk cipher.SecKey) error {
 	pk, err := cipher.PubKeyFromSecKey(sk)
 	if err != nil {
-		return nil, err
+		return err
+	}
+
+	blockSig, err := cipher.SignHash(block.HashHeader(), sk)
+	if err != nil {
+		return fmt.Errorf("failed to sign genesis block: %w", err)
 	}
 
 	cs.chainPK = pk
 	cs.ChainPubKey = pk.Hex()
-
-	blockSig, err := cipher.SignHash(block.HashHeader(), sk)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign genesis block: %w", err)
-	}
-
 	cs.genSig = blockSig
 	cs.GenesisSig = blockSig.Hex()
 
-	return block, nil
+	return nil
+}
+
+// coinHoursName generates the coin hours name from given coin name.
+func coinHoursName(coinName string) string {
+	return fmt.Sprintf("%s coin hours", strings.ToLower(stripWhitespaces(coinName)))
+}
+
+// coinHoursTicker generates the coin hours ticker symbol from given coin ticker.
+func coinHoursTicker(coinTicker string) string {
+	return fmt.Sprintf("%s_CH", strings.ToUpper(stripWhitespaces(coinTicker)))
+}
+
+func stripWhitespaces(s string) string {
+	out := make([]int32, 0, len(s))
+	for _, c := range s {
+		if unicode.IsSpace(c) {
+			continue
+		}
+		out = append(out, c)
+	}
+
+	return string(out)
 }
