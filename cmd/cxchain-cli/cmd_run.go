@@ -69,6 +69,18 @@ func processRunFlags(args []string) (runFlags, cxspec.ChainSpec, cipher.SecKey) 
 	cmd := flag.NewFlagSet("cxchain-cli run", flag.ExitOnError)
 	spec := processSpecFlags(context.Background(), cmd, args)
 
+	webPort, err := spec.ObtainWebInterfacePort()
+	if err != nil {
+		log.WithField("spec_era", spec.CXSpecEra()).
+			Fatal("Failed to obtain web interface port.")
+	}
+
+	genesisAddr, err := spec.ObtainGenesisAddr()
+	if err != nil {
+		log.WithField("spec_era", spec.CXSpecEra()).
+			Fatal("Failed to obtain genesis address.")
+	}
+
 	f := runFlags{
 		cmd: cmd,
 
@@ -81,7 +93,7 @@ func processRunFlags(args []string) (runFlags, cxspec.ChainSpec, cipher.SecKey) 
 		// TODO @evanlinjin: Find a way to set this later on.
 		// TODO @evanlinjin: This way, we would not need to call '.Locate' so
 		// TODO @evanlinjin: early within processSpecFlags()
-		nodeAddr: fmt.Sprintf("http://127.0.0.1:%d", spec.Node.WebInterfacePort),
+		nodeAddr: fmt.Sprintf("http://127.0.0.1:%d", webPort),
 	}
 
 	f.cmd.Usage = func() {
@@ -108,7 +120,7 @@ func processRunFlags(args []string) (runFlags, cxspec.ChainSpec, cipher.SecKey) 
 	// Ensure genesis secret key is provided if 'inject' flag is set.
 	var genSK cipher.SecKey
 	if f.inject {
-		genSK = readRunENVs(cipher.MustDecodeBase58Address(spec.GenesisAddr))
+		genSK = readRunENVs(genesisAddr)
 	}
 
 	// Log stuff.
@@ -137,10 +149,14 @@ func cmdRun(args []string) {
 	c := api.NewClient(flags.nodeAddr)
 
 	// Prepare address.
-	addr := cipher.MustDecodeBase58Address(spec.GenesisAddr)
+	genesisAddr, err := spec.ObtainGenesisAddr()
+	if err != nil {
+		log.WithField("spec_era", spec.CXSpecEra()).
+			Fatal("Failed to obtain genesis address.")
+	}
 
 	// Parse and run program.
-	ux, progB, err := PrepareChainProg(cxFilenames, cxRes.CXSources, c, addr, flags.debugLexer, flags.debugProfile)
+	ux, progB, err := PrepareChainProg(cxFilenames, cxRes.CXSources, c, genesisAddr, flags.debugLexer, flags.debugProfile)
 	if err != nil {
 		log.WithError(err).Fatal("Failed to prepare chain CX program.")
 	}

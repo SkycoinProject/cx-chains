@@ -100,14 +100,19 @@ func trackerUpdateLoop(nodeSK cipher.SecKey, nodeTCPAddr string, spec cxspec.Cha
 	client := cxspec.NewCXTrackerClient(log, nil, specFlags.CXTracker)
 	nodePK := cipher.MustPubKeyFromSecKey(nodeSK)
 
-	block, err := spec.GenerateGenesisBlock()
+	block, err := spec.ObtainGenesisBlock()
 	if err != nil {
 		panic(err) // should not happen
 	}
 	hash := block.HashHeader()
 
+	chainPK, err := spec.ObtainChainPubKey()
+	if err != nil {
+		panic(err) // TODO @evanlinjin: Proper fail and error reporting?
+	}
+
 	// If publisher, ensure spec is registered.
-	if isPub := nodePK == spec.ProcessedChainPubKey(); isPub {
+	if isPub := nodePK == chainPK; isPub {
 		signedSpec, err := cxspec.MakeSignedChainSpec(spec, nodeSK)
 		if err != nil {
 			panic(err) // should not happen
@@ -161,8 +166,10 @@ func trackerUpdateLoop(nodeSK cipher.SecKey, nodeTCPAddr string, spec cxspec.Cha
 func main() {
 	// Register and parse flags for cx chain spec.
 	spec := locateSpec()
-	cxspec.PopulateParamsModule(spec)
-	log.Info(spec.PrintString())
+	if err := spec.PopulateParamsModule(); err != nil {
+		log.WithError(err).Fatal("Failed to populate params module with spec.")
+	}
+	log.Info(spec.String())
 
 	// Register additional CLI flags.
 	cmd := flag.CommandLine
@@ -180,9 +187,10 @@ func main() {
 	ensureConfMode(&conf)
 
 	// Node config: Populate node config based on chain spec content.
-	if err := cxspec.PopulateNodeConfig(specFlags.CXTracker, spec, &conf); err != nil {
-		log.WithError(err).Fatal("Failed to parse from chain spec file.")
+	if err := spec.PopulateNodeConfig(&conf); err != nil {
+		log.WithError(err).Fatal("Failed to populate node config from spec file.")
 	}
+	// TODO @evanlinjin: Do we need to do something about the cx tracker URL?
 
 	// Node config: Ensure node keys are set.
 	//	- If node secret key is null, randomly generate one.
@@ -196,10 +204,15 @@ func main() {
 	}
 	nodePK = cipher.MustPubKeyFromSecKey(nodeSK)
 
+	chainPK, err := spec.ObtainChainPubKey()
+	if err != nil {
+		log.WithError(err).Fatal("Failed to obtain chain pk from spec.")
+	}
+
 	// Node config: Enable publisher mode if conditions are met.
 	// - Skip if 'forceClient' is set.
 	// - Skip if 'nodePK' is not equal to chain spec's PK.
-	if !forceClient && nodePK == spec.ProcessedChainPubKey() {
+	if !forceClient && nodePK == chainPK {
 		conf.BlockchainSeckeyStr = nodeSK.Hex()
 		conf.RunBlockPublisher = true
 	}
@@ -264,8 +277,13 @@ func main() {
 		cxdmsg.ServeDmsg(dmsgCtx, dmsgLog, dmsgConf, dmsgAPI)
 	}()
 
+	progState, err := spec.ObtainGenesisProgState()
+	if err != nil {
+		log.WithError(err).Fatal("Failed to obtain genesis program state from spec.")
+	}
+
 	// Run main daemon.
-	if err := coin.Run(spec.RawGenesisProgState(), gwCh); err != nil {
+	if err := coin.Run(progState, gwCh); err != nil {
 		os.Exit(1)
 	}
 }
