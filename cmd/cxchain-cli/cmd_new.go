@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"github.com/skycoin/cx-chains/src/cx/cxspec/alpha"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -160,7 +161,7 @@ func cmdNew(args []string) {
 	genAddr := cipher.AddressFromPubKey(genPK)
 
 	// Generate and write chain spec file.
-	cSpec, err := cxspec.New(flags.coinName, flags.coinTicker, chainSK, genAddr, genProgState)
+	cSpec, err := alpha.New(flags.coinName, flags.coinTicker, chainSK, genAddr, genProgState)
 	if err != nil {
 		log.WithError(err).
 			Fatal("Failed to generate chain spec.")

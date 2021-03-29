@@ -44,14 +44,14 @@ func (api *API) obtainNodeStats() (NodeStats, error) {
 		return NodeStats{}, err
 	}
 
-	genBlock, err := api.ChainSpec.GenerateGenesisBlock()
+	genBlock, err := api.ChainSpec.ObtainGenesisBlock()
 	if err != nil {
 		return NodeStats{}, err
 	}
 
 	stats := NodeStats{
 		CXChainVersion:     api.Version,
-		CXChainSpecEra:     api.ChainSpec.SpecEra,
+		CXChainSpecEra:     api.ChainSpec.CXSpecEra(),
 		GenesisBlockHash:   cipher.SHA256(genBlock.HashHeader()),
 		PrevBlockHash:      cipher.SHA256(chainMeta.HeadBlock.Head.PrevHash),
 		HeadBlockHash:      cipher.SHA256(chainMeta.HeadBlock.HashHeader()),

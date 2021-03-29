@@ -18,8 +18,14 @@ func cmdPeers(args []string) {
 	rootCmd := flag.NewFlagSet("cxchain-cli peers", flag.ExitOnError)
 	spec := processSpecFlags(context.Background(), rootCmd, args)
 
+	webPort, err := spec.ObtainWebInterfacePort()
+	if err != nil {
+		log.WithField("spec_era", spec.CXSpecEra()).
+			Fatal("Failed to obtain WebInterfacePort")
+	}
+
 	// nodeAddr holds the value parsed from the flags 'node' and 'n'
-	nodeAddr := fmt.Sprintf("http://127.0.0.1:%d", spec.Node.WebInterfacePort)
+	nodeAddr := fmt.Sprintf("http://127.0.0.1:%d", webPort)
 	addNodeAddrFlag := func(cmd *flag.FlagSet) {
 		cmd.StringVar(&nodeAddr, "node", nodeAddr, "HTTP API `ADDRESS` of cxchain node")
 		cmd.StringVar(&nodeAddr, "n", nodeAddr, "shorthand for 'node'")

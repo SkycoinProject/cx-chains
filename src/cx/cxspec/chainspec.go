@@ -25,7 +25,10 @@ type ChainSpec interface {
 	ObtainCoinName() string
 	ObtainCoinTicker() string
 	ObtainGenesisBlock() (*coin.Block, error)
+	ObtainGenesisAddr() (cipher.Address, error)
+	ObtainGenesisProgState() ([]byte, error)
 	ObtainChainPubKey() (cipher.PubKey, error)
+	ObtainWebInterfacePort() (int, error)
 
 	PopulateParamsModule() error
 	PopulateNodeConfig(conf *skycoin.NodeConfig) error

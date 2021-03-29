@@ -152,14 +152,6 @@ func New(coin, ticker string, chainSK cipher.SecKey, genesisAddr cipher.Address,
 	return spec, nil
 }
 
-func (cs *ChainSpec) RawGenesisProgState() []byte {
-	b, err := progSEnc.DecodeString(cs.GenesisProgState)
-	if err != nil {
-		panic(err)
-	}
-	return b
-}
-
 // SpecHash returns the hashed spec object.
 func (cs *ChainSpec) CXSpecHash() cipher.SHA256 {
 	b, err := json.Marshal(cs)
@@ -237,9 +229,25 @@ func (cs *ChainSpec) ObtainGenesisBlock() (*coin.Block, error) {
 	return block, nil
 }
 
+// ObtainGenesisAddr obtains the genesis address.
+func (cs *ChainSpec) ObtainGenesisAddr() (cipher.Address, error) {
+	return cipher.DecodeBase58Address(cs.GenesisAddr)
+}
+
+// ObtainGenesisProgState obtains the genesis program state.
+func (cs *ChainSpec) ObtainGenesisProgState() ([]byte, error) {
+	return progSEnc.DecodeString(cs.GenesisProgState)
+}
+
+
 // ObtainChainPubKey returns the processed chain public key.
 func (cs *ChainSpec) ObtainChainPubKey() (cipher.PubKey, error) {
 	return cipher.PubKeyFromHex(cs.ChainPubKey)
+}
+
+// ObtainWebInterfacePort returns the web interface port.
+func (cs *ChainSpec) ObtainWebInterfacePort() (int, error) {
+	return cs.Node.WebInterfacePort, nil
 }
 
 // PopulateParamsModule populates the params module within cx chain.
