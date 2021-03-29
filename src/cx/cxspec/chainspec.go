@@ -1,6 +1,7 @@
 package cxspec
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/skycoin/skycoin/src/cipher"
@@ -36,6 +37,20 @@ type TemplateSpecGenerator func() ChainSpec
 
 // SpecFinalizer finalizes the chain spec.
 type SpecFinalizer func(cs ChainSpec) error
+
+type WrappedChainSpec struct { ChainSpec }
+
+// UnmarshalJSON implements json.Unmarshaler
+func (ws *WrappedChainSpec) UnmarshalJSON(b []byte) error {
+	var tempV struct{
+		Era string `json:"era"`
+	}
+	if err := json.Unmarshal(b, &tempV); err != nil {
+		return fmt.Errorf("failed to unmarshal into temporary structure: %w", err)
+	}
+
+	return nil
+}
 
 // SignedChainSpec contains a chain spec alongside a valid signature.
 type SignedChainSpec struct {
