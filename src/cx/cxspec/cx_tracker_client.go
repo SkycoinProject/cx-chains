@@ -59,7 +59,8 @@ func (c *CXTrackerClient) AllSpecs(ctx context.Context) ([]SignedChainSpec, erro
 
 	for i, spec := range specs {
 		if err := spec.Verify(); err != nil {
-			return nil, fmt.Errorf("failed to verify returned spec [%d]%s: %w", i, spec.Spec.ChainPubKey, err)
+			pk, _ := spec.Spec.ObtainChainPubKey()
+			return nil, fmt.Errorf("failed to verify returned spec [%d]%s: %w", i, pk.Hex(), err)
 		}
 	}
 

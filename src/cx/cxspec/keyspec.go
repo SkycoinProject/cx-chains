@@ -3,6 +3,8 @@ package cxspec
 import (
 	"fmt"
 
+	"github.com/skycoin/cx-chains/src/cx/cxspec/alpha"
+
 	"github.com/skycoin/skycoin/src/cipher"
 )
 
@@ -31,7 +33,7 @@ func KeySpecFromSecKey(keyType string, sk cipher.SecKey, incSK, incAddr bool) Ke
 	addr := cipher.AddressFromPubKey(pk)
 
 	spec := KeySpec{
-		SpecEra: Era,
+		SpecEra: alpha.Era, // TODO @evanlinjin: Figure out where to define this. Do we also need to change KeySpec to an interface?
 		KeyType: keyType,
 		PubKey:  pk.Hex(),
 		SecKey:  "",
@@ -57,7 +59,7 @@ func KeySpecFromPubKey(keyType string, pk cipher.PubKey, incAddr bool) KeySpec {
 	addr := cipher.AddressFromPubKey(pk)
 
 	spec := KeySpec{
-		SpecEra: Era,
+		SpecEra: alpha.Era, // TODO @evanlinjin: Figure out where to define this. Do we also need to change KeySpec to an interface?
 		KeyType: keyType,
 		PubKey:  pk.Hex(),
 		SecKey:  "",

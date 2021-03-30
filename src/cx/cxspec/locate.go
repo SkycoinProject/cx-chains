@@ -42,88 +42,12 @@ var (
 	ErrInvalidLocPrefix = errors.New("invalid spec location prefix")
 )
 
-// Locate locates the chain spec given a 'loc' string.
-// The 'loc' string is to be of format '<location-prefix>:<location>'.
-// * <location-prefix> is 'tracker' if undefined.
-// * <location> either specifies the cx chain's genesis hash (if
-// <location-prefix> is 'tracker') or filepath of the spec file (if
-// <location-prefix> is 'file').
-func Locate(ctx context.Context, log logrus.FieldLogger, tracker *CXTrackerClient, loc string) (ChainSpec, error) {
-	// Ensure logger is existent.
-	if log == nil {
-		log = logging.MustGetLogger("cxspec").WithField("func", "Locate")
-	}
-
-	prefix, suffix, err := splitLocString(loc)
-	if err != nil {
-		return ChainSpec{}, err
-	}
-
-	// Check location prefix (LocPrefix).
-	switch prefix {
-	case FileLoc:
-		if suffix == "" {
-			suffix = DefaultSpecFilepath
-		}
-
-		return ReadSpecFile(suffix)
-
-	case TrackerLoc:
-		// Check that 'tracker' is not nil.
-		if tracker == nil {
-			return ChainSpec{}, ErrEmptyTracker
-		}
-
-		// Obtain genesis hash from hex string.
-		hash, err := cipher.SHA256FromHex(suffix)
-		if err != nil {
-			return ChainSpec{}, fmt.Errorf("invalid genesis hash provided '%s': %w", loc, err)
-		}
-
-		// Obtain spec from tracker.
-		signedChainSpec, err := tracker.SpecByGenesisHash(ctx, hash)
-		if err != nil {
-			return ChainSpec{}, fmt.Errorf("chain spec not of genesis hash not found in tracker: %w", err)
-		}
-
-		// Verify again (no harm in doing it twice).
-		if err := signedChainSpec.Verify(); err != nil {
-			return ChainSpec{}, err
-		}
-
-		return signedChainSpec.Spec, nil
-
-	default:
-		return ChainSpec{}, fmt.Errorf("%w '%s'", ErrInvalidLocPrefix, prefix)
-	}
-}
-
-func splitLocString(loc string) (prefix LocPrefix, suffix string, err error) {
-	loc = strings.TrimSpace(loc)
-	if loc == "" {
-		return "", "", ErrEmptySpec
-	}
-
-	locParts := strings.SplitN(loc, ":", 2)
-
-	switch len(locParts) {
-	case 1:
-		locParts = append([]string{string(TrackerLoc)}, locParts...)
-	case 2:
-		// continue
-	default:
-		panic("internal error: Locate() should never return >2 location parts")
-	}
-
-	return LocPrefix(locParts[0]), locParts[1], nil
-}
-
 // LocateConfig contains flag values for Locate.
 type LocateConfig struct {
 	CXChain   string // CX Chain spec location string.
 	CXTracker string // CX Tracker URL.
 
-	Logger logrus.FieldLogger
+	Logger     logrus.FieldLogger
 	HTTPClient *http.Client
 }
 
@@ -171,9 +95,85 @@ func LocateWithConfig(ctx context.Context, conf *LocateConfig) (ChainSpec, error
 	return Locate(ctx, conf.Logger, conf.TrackerClient(), conf.CXChain)
 }
 
+// Locate locates the chain spec given a 'loc' string.
+// The 'loc' string is to be of format '<location-prefix>:<location>'.
+// * <location-prefix> is 'tracker' if undefined.
+// * <location> either specifies the cx chain's genesis hash (if
+// <location-prefix> is 'tracker') or filepath of the spec file (if
+// <location-prefix> is 'file').
+func Locate(ctx context.Context, log logrus.FieldLogger, tracker *CXTrackerClient, loc string) (ChainSpec, error) {
+	// Ensure logger is existent.
+	if log == nil {
+		log = logging.MustGetLogger("cxspec").WithField("func", "Locate")
+	}
+
+	prefix, suffix, err := splitLocString(loc)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check location prefix (LocPrefix).
+	switch prefix {
+	case FileLoc:
+		if suffix == "" {
+			suffix = DefaultSpecFilepath
+		}
+
+		return ReadSpecFile(suffix)
+
+	case TrackerLoc:
+		// Check that 'tracker' is not nil.
+		if tracker == nil {
+			return nil, ErrEmptyTracker
+		}
+
+		// Obtain genesis hash from hex string.
+		hash, err := cipher.SHA256FromHex(suffix)
+		if err != nil {
+			return nil, fmt.Errorf("invalid genesis hash provided '%s': %w", loc, err)
+		}
+
+		// Obtain spec from tracker.
+		signedChainSpec, err := tracker.SpecByGenesisHash(ctx, hash)
+		if err != nil {
+			return nil, fmt.Errorf("chain spec not of genesis hash not found in tracker: %w", err)
+		}
+
+		// Verify again (no harm in doing it twice).
+		if err := signedChainSpec.Verify(); err != nil {
+			return nil, err
+		}
+
+		return signedChainSpec.Spec, nil
+
+	default:
+		return nil, fmt.Errorf("%w '%s'", ErrInvalidLocPrefix, prefix)
+	}
+}
+
 /*
 	<< Helper functions >>
 */
+
+func splitLocString(loc string) (prefix LocPrefix, suffix string, err error) {
+	loc = strings.TrimSpace(loc)
+	if loc == "" {
+		return "", "", ErrEmptySpec
+	}
+
+	locParts := strings.SplitN(loc, ":", 2)
+
+	switch len(locParts) {
+	case 1:
+		locParts = append([]string{string(TrackerLoc)}, locParts...)
+	case 2:
+		// continue
+	default:
+		panic("internal error: Locate() should never return >2 location parts")
+	}
+
+	return LocPrefix(locParts[0]), locParts[1], nil
+}
 
 func obtainFlagValue(args []string, key string) (string, bool) {
 	var (

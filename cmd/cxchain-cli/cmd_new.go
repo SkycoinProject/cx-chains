@@ -7,15 +7,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/skycoin/skycoin/src/cipher"
-
 	"github.com/skycoin/cx/cxgo/cxlexer"
 	"github.com/skycoin/cx/cxgo/parser"
-
-	"github.com/skycoin/cx-chains/src/cx/cxutil"
+	"github.com/skycoin/skycoin/src/cipher"
 
 	"github.com/skycoin/cx-chains/src/cx/cxflags"
 	"github.com/skycoin/cx-chains/src/cx/cxspec"
+	"github.com/skycoin/cx-chains/src/cx/cxspec/alpha"
+	"github.com/skycoin/cx-chains/src/cx/cxutil"
 )
 
 const filePerm = 0644
@@ -23,10 +22,11 @@ const filePerm = 0644
 type newFlags struct {
 	cmd *flag.FlagSet
 
-	replace    bool
-	unifyKeys  bool
-	coinName   string
-	coinTicker string
+	replace     bool
+	unifyKeys   bool
+	coinName    string
+	coinTicker  string
+	trackerAddr string
 
 	debugLexer   bool
 	debugProfile int
@@ -43,10 +43,11 @@ func processNewFlags(args []string) newFlags {
 	f := newFlags{
 		cmd: flag.NewFlagSet("cxchain-cli new", flag.ExitOnError),
 
-		replace:    false,
-		unifyKeys:  false,
-		coinName:   "skycoin",
-		coinTicker: "SKY",
+		replace:     false,
+		unifyKeys:   false,
+		coinName:    "skycoin",
+		coinTicker:  "SKY",
+		trackerAddr: cxspec.DefaultTrackerURL,
 
 		debugLexer:   false,
 		debugProfile: 0,
@@ -66,10 +67,10 @@ func processNewFlags(args []string) newFlags {
 	f.cmd.BoolVar(&f.replace, "r", f.replace, "shorthand for 'replace'")
 	f.cmd.BoolVar(&f.unifyKeys, "unify", f.unifyKeys, "whether to use the same keys for genesis and chain")
 	f.cmd.BoolVar(&f.unifyKeys, "u", f.unifyKeys, "shorthand for 'unify'")
+
 	f.cmd.StringVar(&f.coinName, "coin", f.coinName, "`NAME` for cx coin")
-	f.cmd.StringVar(&f.coinName, "c", f.coinName, "shorthand for 'coin'")
 	f.cmd.StringVar(&f.coinTicker, "ticker", f.coinTicker, "`SYMBOL` for cx coin ticker")
-	f.cmd.StringVar(&f.coinTicker, "t", f.coinTicker, "shorthand for 'ticker'")
+	f.cmd.StringVar(&f.trackerAddr, "tracker", f.trackerAddr, "`URL` of cx tracker")
 
 	f.cmd.BoolVar(&f.debugLexer, "debug-lexer", f.debugLexer, "enable lexer debugging by printing all scanner tokens")
 	f.cmd.IntVar(&f.debugProfile, "debug-profile", f.debugProfile, "Enable CPU+MEM profiling and set CPU profiling rate. Visualize .pprof files with 'go get github.com/google/pprof' and 'pprof -http=:8080 file.pprof'")
@@ -160,7 +161,7 @@ func cmdNew(args []string) {
 	genAddr := cipher.AddressFromPubKey(genPK)
 
 	// Generate and write chain spec file.
-	cSpec, err := cxspec.New(flags.coinName, flags.coinTicker, chainSK, genAddr, genProgState)
+	cSpec, err := alpha.New(flags.coinName, flags.coinTicker, chainSK, flags.trackerAddr, genAddr, genProgState)
 	if err != nil {
 		log.WithError(err).
 			Fatal("Failed to generate chain spec.")

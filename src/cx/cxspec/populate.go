@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"strings"
 	"time"
 
 	"github.com/skycoin/cx-chains/src/api"
@@ -15,87 +14,18 @@ import (
 	"github.com/skycoin/cx-chains/src/wallet"
 )
 
-// PopulateParamsModule populates the params module within cx chain.
-func PopulateParamsModule(cs ChainSpec) {
-	// TODO @evanlinjin: Figure out distribution.
-	params.MainNetDistribution = params.Distribution{
-		MaxCoinSupply:        cs.MaxCoinSupply,
-		InitialUnlockedCount: 1,
-		UnlockAddressRate:    0,
-		UnlockTimeInterval:   0,
-		Addresses:            []string{cs.GenesisAddr},
-	}
-	params.UserVerifyTxn = params.VerifyTxn{
-		BurnFactor:          uint32(cs.Node.UserBurnFactor),
-		MaxTransactionSize:  cs.Node.UserMaxTransactionSize,
-		MaxDropletPrecision: uint8(cs.Node.UserMaxDropletPrecision),
-	}
-	params.InitFromEnv()
-}
-
-// PopulateNodeConfig populates the node config with values from cx chain spec.
-func PopulateNodeConfig(trackerAddr string, spec ChainSpec, conf *skycoin.NodeConfig) error {
-	if spec.SpecEra != Era {
-		return fmt.Errorf("unsupported spec era '%s'", spec.SpecEra)
-	}
-
-	genesis, err := spec.GenerateGenesisBlock()
-	if err != nil {
-		return err
-	}
-	peerListURL := fmt.Sprintf("%s/peerlists/%s.txt", trackerAddr, genesis.HashHeader())
-
-	conf.CoinName = spec.CoinName
-	conf.PeerListURL = peerListURL
-	conf.Port = spec.Node.Port
-	conf.WebInterfacePort = spec.Node.WebInterfacePort
-	conf.UnconfirmedVerifyTxn = params.VerifyTxn{
-		BurnFactor:          spec.Protocol.UnconfirmedBurnFactor,
-		MaxTransactionSize:  spec.Protocol.UnconfirmedMaxTransactionSize,
-		MaxDropletPrecision: spec.Protocol.UnconfirmedMaxDropletPrecision,
-	}
-	conf.CreateBlockVerifyTxn = params.VerifyTxn{
-		BurnFactor:          spec.Protocol.CreateBlockBurnFactor,
-		MaxTransactionSize:  spec.Protocol.CreateBlockMaxTransactionSize,
-		MaxDropletPrecision: spec.Protocol.CreateBlockMaxDropletPrecision,
-	}
-	conf.MaxBlockTransactionsSize = spec.Protocol.MaxBlockTransactionSize
-	conf.GenesisSignatureStr = spec.GenesisSig
-	conf.GenesisAddressStr = spec.GenesisAddr
-	conf.BlockchainPubkeyStr = spec.ChainPubKey
-	conf.GenesisTimestamp = spec.GenesisTimestamp
-	conf.GenesisCoinVolume = spec.GenesisCoinVolume
-	conf.DefaultConnections = spec.Node.DefaultConnections
-	conf.Fiber = readable.FiberConfig{
-		Name:            spec.CoinName,
-		DisplayName:     spec.CoinName,
-		Ticker:          spec.CoinTicker,
-		CoinHoursName:   spec.CoinHoursName,
-		CoinHoursTicker: spec.CoinHoursTicker,
-		ExplorerURL:     "", // TODO @evanlinjin: CX Chain explorer?
-	}
-
-	if conf.DataDirectory == "" {
-		conf.DataDirectory = "$HOME/.cxchain/" + spec.CoinName
-	} else {
-		conf.DataDirectory = strings.ReplaceAll(conf.DataDirectory, "{coin}", spec.CoinName)
-	}
-
-	return nil
-}
-
 // ReadSpecFile reads chain spec from given filename.
 func ReadSpecFile(filename string) (ChainSpec, error) {
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return ChainSpec{}, fmt.Errorf("failed to read chain spec file '%s': %w", filename, err)
+		return nil, fmt.Errorf("failed to read chain spec file '%s': %w", filename, err)
 	}
-	var spec ChainSpec
+	var spec WrappedChainSpec
 	if err := json.Unmarshal(b, &spec); err != nil {
-		return ChainSpec{}, fmt.Errorf("chain spec file '%s' is ill-formed: %w", filename, err)
+		return nil, fmt.Errorf("chain spec file '%s' is ill-formed: %w", filename, err)
 	}
-	if _, err := spec.GenerateGenesisBlock(); err != nil {
-		return ChainSpec{}, fmt.Errorf("chain spec file '%s' cannot generate genesis block: %w", filename, err)
+	if _, err := spec.ObtainGenesisBlock(); err != nil {
+		return nil, fmt.Errorf("chain spec file '%s' cannot generate genesis block: %w", filename, err)
 	}
 	return spec, nil
 }

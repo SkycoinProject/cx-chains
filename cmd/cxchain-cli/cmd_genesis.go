@@ -12,7 +12,7 @@ import (
 
 type genesisFlags struct {
 	cmd *flag.FlagSet
-	
+
 	in string
 }
 
@@ -58,7 +58,7 @@ func cmdGenesis(args []string) {
 			Fatal("Failed to decode file")
 	}
 
-	block, err := cSpec.GenerateGenesisBlock()
+	block, err := cSpec.ObtainGenesisBlock()
 	if err != nil {
 		log.WithError(err).
 			Fatal("Failed to generate genesis block.")

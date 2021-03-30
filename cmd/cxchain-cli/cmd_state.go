@@ -29,11 +29,23 @@ func processStateFlags(args []string) (stateFlags, cipher.Address) {
 	cmd := flag.NewFlagSet("cxchain-cli state", flag.ExitOnError)
 	spec := processSpecFlags(context.Background(), cmd, args)
 
+	webPort, err := spec.ObtainWebInterfacePort()
+	if err != nil {
+		log.WithField("spec_era", spec.CXSpecEra()).
+			Fatal("Failed to obtain web interface port.")
+	}
+
+	genesisAddr, err := spec.ObtainGenesisAddr()
+	if err != nil {
+		log.WithField("spec_era", spec.CXSpecEra()).
+			Fatal("Failed to obtain genesis address.")
+	}
+
 	f := stateFlags{
 		cmd:         cmd,
 		MemoryFlags: cxflags.DefaultMemoryFlags(),
-		nodeAddr:    fmt.Sprintf("http://127.0.0.1:%d", spec.Node.WebInterfacePort),
-		appAddr:     cipher.MustDecodeBase58Address(spec.GenesisAddr).String(),
+		nodeAddr:    fmt.Sprintf("http://127.0.0.1:%d", webPort),
+		appAddr:     genesisAddr.String(),
 	}
 
 	f.cmd.Usage = func() {
