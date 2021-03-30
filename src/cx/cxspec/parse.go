@@ -18,8 +18,7 @@ func Parse(raw []byte) (ChainSpec, error) {
 
 	switch era {
 	case alpha.Era:
-		// TODO @evanlinjin: Ensure this implements ChainSpec.
-		v = new(alpha.ChainSpec)
+		v = &alpha.ChainSpec{}
 	default:
 		return nil, fmt.Errorf("unsupported spec era '%s'", era)
 	}

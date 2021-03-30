@@ -20,7 +20,7 @@ func ReadSpecFile(filename string) (ChainSpec, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read chain spec file '%s': %w", filename, err)
 	}
-	var spec ChainSpec
+	var spec WrappedChainSpec
 	if err := json.Unmarshal(b, &spec); err != nil {
 		return nil, fmt.Errorf("chain spec file '%s' is ill-formed: %w", filename, err)
 	}

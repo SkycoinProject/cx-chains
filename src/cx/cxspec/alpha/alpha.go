@@ -112,14 +112,14 @@ type ChainSpec struct {
 }
 
 // New generates a new chain spec.
-func New(coin, ticker string, chainSK cipher.SecKey, genesisAddr cipher.Address, genesisProgState []byte) (*ChainSpec, error) {
+func New(coin, ticker string, chainSK cipher.SecKey, trackerAddr string, genesisAddr cipher.Address, genesisProgState []byte) (*ChainSpec, error) {
 	coin = strings.ToLower(strings.Replace(coin, " ", "", -1))
 	ticker = strings.ToUpper(strings.Replace(ticker, " ", "", -1))
 
 	spec := &ChainSpec{
 		SpecEra:     Era,
 		ChainPubKey: "", // ChainPubKey is generated at a later step via generateAndSignGenesisBlock
-		TrackerAddr: "", // TODO @evanlinjin: Have default tracker address.
+		TrackerAddr: trackerAddr,
 		Protocol:    DefaultProtocolParams(),
 		Node:        DefaultNodeParams(),
 

@@ -11,6 +11,7 @@ import (
 	"github.com/skycoin/cx-chains/src/skycoin"
 )
 
+// TODO @evanlinjin: Figure out if this is needed.
 const (
 	specEraFieldName = "spec_era"
 )
@@ -41,23 +42,36 @@ type TemplateSpecGenerator func() ChainSpec
 // SpecFinalizer finalizes the chain spec.
 type SpecFinalizer func(cs ChainSpec) error
 
+// WrappedChainSpec allows a chain spec to be marshalled/unmarshalled to and
+// from raw JSON data.
 type WrappedChainSpec struct { ChainSpec }
 
 // UnmarshalJSON implements json.Unmarshaler
 func (ws *WrappedChainSpec) UnmarshalJSON(b []byte) error {
 	var tempV struct{
-		Era string `json:"era"`
+		Era string `json:"spec_era"`
 	}
 	if err := json.Unmarshal(b, &tempV); err != nil {
 		return fmt.Errorf("failed to unmarshal into temporary structure: %w", err)
 	}
 
-	return nil
+	var err error
+	ws.ChainSpec, err = Parse(b)
+
+	return err
 }
+
+// func (ws *WrappedChainSpec) MarshalJSON() ([]byte, error) {
+// 	if ws.ChainSpec == nil {
+// 		return []byte("null"), nil
+// 	}
+//
+// 	return json.Marshal(ws.ChainSpec)
+// }
 
 // SignedChainSpec contains a chain spec alongside a valid signature.
 type SignedChainSpec struct {
-	Spec        ChainSpec `json:"spec"`
+	Spec        WrappedChainSpec `json:"spec"`
 	GenesisHash string    `json:"genesis_hash,omitempty"`
 	Sig         string    `json:"sig"` // hex representation of signature
 }
@@ -95,7 +109,7 @@ func MakeSignedChainSpec(spec ChainSpec, sk cipher.SecKey) (SignedChainSpec, err
 	}
 
 	signedSpec := SignedChainSpec{
-		Spec:        spec,
+		Spec:        WrappedChainSpec{ ChainSpec: spec },
 		GenesisHash: genesis.HashHeader().Hex(),
 		Sig:         sig.Hex(),
 	}
