@@ -12,7 +12,7 @@ import (
 
 type genesisFlags struct {
 	cmd *flag.FlagSet
-	
+
 	in string
 }
 

@@ -22,10 +22,10 @@ const filePerm = 0644
 type newFlags struct {
 	cmd *flag.FlagSet
 
-	replace    bool
-	unifyKeys  bool
-	coinName   string
-	coinTicker string
+	replace     bool
+	unifyKeys   bool
+	coinName    string
+	coinTicker  string
 	trackerAddr string
 
 	debugLexer   bool
@@ -43,10 +43,10 @@ func processNewFlags(args []string) newFlags {
 	f := newFlags{
 		cmd: flag.NewFlagSet("cxchain-cli new", flag.ExitOnError),
 
-		replace:    false,
-		unifyKeys:  false,
-		coinName:   "skycoin",
-		coinTicker: "SKY",
+		replace:     false,
+		unifyKeys:   false,
+		coinName:    "skycoin",
+		coinTicker:  "SKY",
 		trackerAddr: cxspec.DefaultTrackerURL,
 
 		debugLexer:   false,

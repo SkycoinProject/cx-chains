@@ -2,6 +2,7 @@ package cxspec
 
 import (
 	"fmt"
+
 	"github.com/skycoin/cx-chains/src/cx/cxspec/alpha"
 
 	"github.com/skycoin/skycoin/src/cipher"

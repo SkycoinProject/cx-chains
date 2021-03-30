@@ -85,8 +85,8 @@ type ChainSpec struct {
 	Node     NodeParams     `json:"node"`     // Default params for a node of given coin (this may be removed in future eras).
 
 	/* Identity Params */
-	CoinName        string `json:"coin_name"`         // Coin display name (e.g. skycoin).
-	CoinTicker      string `json:"coin_ticker"`       // Coin price ticker (e.g. SKY).
+	CoinName   string `json:"coin_name"`   // Coin display name (e.g. skycoin).
+	CoinTicker string `json:"coin_ticker"` // Coin price ticker (e.g. SKY).
 
 	/* Genesis Params */
 	GenesisAddr       string `json:"genesis_address"`       // Genesis address (base58 representation).
@@ -123,8 +123,8 @@ func New(coin, ticker string, chainSK cipher.SecKey, trackerAddr string, genesis
 		Protocol:    DefaultProtocolParams(),
 		Node:        DefaultNodeParams(),
 
-		CoinName:        coin,
-		CoinTicker:      ticker,
+		CoinName:   coin,
+		CoinTicker: ticker,
 
 		GenesisAddr:       genesisAddr.String(),
 		GenesisSig:        "", // GenesisSig is generated at a later step via generateAndSignGenesisBlock
@@ -238,7 +238,6 @@ func (cs *ChainSpec) ObtainGenesisAddr() (cipher.Address, error) {
 func (cs *ChainSpec) ObtainGenesisProgState() ([]byte, error) {
 	return progSEnc.DecodeString(cs.GenesisProgState)
 }
-
 
 // ObtainChainPubKey returns the processed chain public key.
 func (cs *ChainSpec) ObtainChainPubKey() (cipher.PubKey, error) {

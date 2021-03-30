@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
+
+	"github.com/skycoin/skycoin/src/cipher"
+
 	"github.com/skycoin/cx-chains/src/cx/cxspec"
 	"github.com/skycoin/cx-chains/src/cx/cxutil"
-	"github.com/skycoin/skycoin/src/cipher"
-	"os"
 )
 
 type postFlags struct {
@@ -25,8 +27,8 @@ func processPostFlags(args []string) (postFlags, cipher.SecKey) {
 
 		specInput:    cxspec.DefaultSpecFilepath,
 		signedOutput: "", // empty for no output
-		dryRun: false,
-		tracker: cxspec.DefaultTrackerURL,
+		dryRun:       false,
+		tracker:      cxspec.DefaultTrackerURL,
 	}
 
 	f.cmd.Usage = func() {
